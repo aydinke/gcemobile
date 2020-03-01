@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+
+<html>
+
+<!- 
+
+Mini web app for simple heating / hotwater / ventilation (VMC) remote control
+using a GCE Electronics EDRT2 and X-4FP module
+
+Written by Aydin KURT-ELLI
+V0.1, Feb 24, 2020
+
+Configuration assumptions:
+- setup your EDRT2 with "Sorties Virtuelles"
+- VO1 = Heating, VO2 = Hot water, VO3 = VMC
+- all timing assumes use of "Scénarios" configuration in the EDRT2
+- the IP address / port / apikey is configured using the web interface of this web app
+- these details are stored using the "localstorage" method, so not kept on any remote server
+- localstorage lost if cache cleared
+- note security concern, the EDRT2 only has an http interface, not https
+
+ -->
+
+<title>GCE Mobile App</title>
+
+<head>
+<link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
+<link rel="stylesheet" type="text/css" href="index.css">
+</head>
+
+
+<body style="background-color:#8A8B89;">
+
+<div class="container">
+
+<p><img src="img/gcelogo.png"></p>
+
+<div class="w3-row w3-section">
+<div class="w3-col center"><center><img src="img/icons8-start-64.png" onClick="changeTab('start');"> &nbsp; <img src="img/icons8-settings-64.png" onClick="changeTab('settings');">
+</center></div>
+
+
+<br>
+
+<div id="conn_status" class="w3-container w3-cell-middle w3-cell blinking" style="display:none">
+Connection error
+</div>
+<br>
+
+
+<div class="de">
+	<div class="den">
+	  <div class="dene">
+		<div class="denem">
+		  <div id="temp" class="deneme">00<span>.0</span><strong>&deg</strong>
+		  </div>
+		</div>
+	  </div>
+	</div>
+</div>
+<br>
+
+<div id="start" class="tab w3-center w3-animate-right">
+
+<table class="w3-table">
+<tr>
+	<td class="w3-container w3-cell-middle w3-text-white w3-cell">Heating</td>
+	<td><label class="switch">
+  <input type="checkbox" id="Heating" name="Heating" value="Heating" onClick="setEDRT(edrthttp, 'Heating')">
+  <span class="slider round"></span>
+</label></td>
+</tr>
+
+<tr>
+	<td class="w3-container w3-cell-middle w3-text-white w3-cell">Hot water</td>
+	<td><label class="switch">
+  <input type="checkbox" id="Hotwater" name="Hotwater" value="Hotwater" onClick="setEDRT(edrthttp, 'Hotwater')";>
+  <span class="slider round"></span>
+</label></td>
+</tr>
+
+<tr>
+	<td class="w3-container w3-cell-middle w3-text-white w3-cell">VMC</td>
+	<td><label class="switch">
+  <input type="checkbox" id="VMC" name="VMC" value="VMC" onClick="setEDRT(edrthttp, 'VMC')";>
+  <span class="slider round"></span>
+</label></td>
+</tr>
+
+</table>
+
+
+</div>
+<br>
+
+
+
+
+<div id="settings" class="tab w3-center w3-animate-right w3-text-white" style="width:120; display:none">
+<form id="settings_form" class="w3-container w3-card-4 w3-dark-grey w3-text-white w3-margin w3-round-large">
+
+	<div class="w3-row w3-section">
+
+	<div class="w3-col">apikey</div>
+	<div class="w3-col"><input class="w3-input w3-round-large" name="apikey" type="text"></div>
+
+	<div class="w3-col">ip / hostname</div><div class="w3-col"><input class="w3-input w3-round-large" name="edrt_ip" type="text"></div>
+
+	<div class="w3-col">port</div><div class="w3-col"><input class="w3-input w3-round-large" name="edrt_port" type="text"></div>
+
+	<div class="w3-col">&nbsp </div>
+
+	<div class="w3-col"><button class="w3-btn w3-round-large w3-white w3-hover-grey" onClick="saveSettings();">Save settings</button></div>
+
+</div>
+
+
+
+</form>
+</div>
+
+<pre>
+
+</pre>
+
+<div class="w3-container w3-cell-middle w3-text-white w3-cell">
+<center><font size="2"><a target="_blank" href="https://icons8.com/icons/set/settings">Settings icon</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></font></center>
+</div>
+
+
+</div>
+
+
+</body>
+
+<script type="text/javascript">
+
+// main script
+
+var apikey = "";
+var edrt_ip = "";
+var edrt_port = "";
+
+// retrieve stored settings from localstore (if available)
+
+getSettings();
+
+// setup main http calls
+
+var edrt_url = "http://"+edrt_ip+":"+edrt_port+"/api/xdevices.json?key="+apikey;
+var edrthttp = new XMLHttpRequest();
+
+edrthttp.onreadystatechange = function() {
+  if (this.readyState == 4 && this.status == 200) {
+    var edrtResp = JSON.parse(this.responseText);
+	if (edrtResp.VO1 == 1) document.getElementById("Heating").checked = true;
+	if (edrtResp.VO2 == 1) document.getElementById("Hotwater").checked = true;
+	if (edrtResp.VO3 == 1) document.getElementById("VMC").checked = true;
+	document.getElementById("conn_status").style.display = "none";
+  }
+
+};
+
+
+// get virtual interfaces
+
+edrthttp.open("GET", edrt_url+"&Get=VO", true);
+edrthttp.onerror = function() {
+	document.getElementById("conn_status").style.display = "block";
+}
+edrthttp.send();
+
+// setup get temp timer loop
+
+getTemperature();
+setInterval (getTemperature, 30000);
+
+
+// library functions
+
+function setEDRT(edrthttp, VO) {
+
+	if (VO == "Heating") { VO_id = 1; }
+	else if (VO == "Hotwater") { VO_id = 2; }
+	else { VO_id = 3; }
+
+	if (document.getElementById(VO).checked == true) {
+		VO_url = "&SetVO=00"+VO_id;
+	} else {
+		VO_url = "&ClearVO=00"+VO_id;
+	}
+	
+	edrthttp.open("GET", edrt_url+VO_url, true);
+	edrthttp.onerror = function() {
+		document.getElementById("conn_status").style.display = "block";
+	}
+	edrthttp.send();
+}
+
+
+// get temperature
+
+function getTemperature() {
+
+	var edrt_url = "http://"+edrt_ip+":"+edrt_port+"/api/xdevices.json?key="+apikey;
+	var edrttemphttp = new XMLHttpRequest();
+
+	edrttemphttp.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			edrtTempResp = JSON.parse(this.responseText);
+			t = String(edrtTempResp["ENO ANALOG1"].toFixed(1));
+			temp_str = t.split(".");
+			temp_html = temp_str[0]+"<span>."+temp_str[1].charAt(0)+"</span><strong>&deg;</strong>";
+			document.getElementById("temp").innerHTML = temp_html;
+		}
+	document.getElementById("conn_status").style.display = "none";
+	}
+  
+	edrttemphttp.open("GET", edrt_url+"&Get=XENO", true);
+	edrttemphttp.onerror = function() {
+		document.getElementById("conn_status").style.display = "block";
+	}
+	edrttemphttp.send();
+
+};
+
+function changeTab(tab) {
+	x = document.getElementsByClassName("tab");
+	for (i = 0; i< x.length; i++) {
+		x[i].style.display = "none";
+	}
+	document.getElementById(tab).style.display = "block";
+}
+
+function getSettings() {
+
+	if( localStorage.apikey ) {
+		apikey = localStorage.apikey;
+	} else {
+		apikey="apikey";
+	}
+	document.getElementById("settings_form").elements.namedItem("apikey").value = apikey;
+
+	if( localStorage.edrt_ip ) {
+		edrt_ip = localStorage.edrt_ip;
+	} else {
+		edrt_ip="192.168.1.250";
+	}
+	document.getElementById("settings_form").elements.namedItem("edrt_ip").value = edrt_ip;
+
+	if( localStorage.edrt_port ) {
+		edrt_port = localStorage.edrt_port;
+	} else {
+		edrt_port="80";
+	}
+	document.getElementById("settings_form").elements.namedItem("edrt_port").value = edrt_port;
+	
+}
+
+function saveSettings() {
+	localStorage.apikey = document.getElementById("settings_form").elements.namedItem("apikey").value;
+	localStorage.edrt_ip = document.getElementById("settings_form").elements.namedItem("edrt_ip").value;
+	localStorage.edrt_port = document.getElementById("settings_form").elements.namedItem("edrt_port").value;
+}
+
+
+</script>
+
+</html>
