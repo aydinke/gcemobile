@@ -24,8 +24,25 @@ Configuration assumptions:
 <title>GCE Mobile App</title>
 
 <head>
+<meta name="viewport" content="width=320, initial-scale=1, user-scalable=yes">
 <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
 <link rel="stylesheet" type="text/css" href="index.css">
+
+<link rel="apple-touch-icon" sizes="57x57" href="img/favicons/apple-icon-57x57.png">
+<link rel="apple-touch-icon" sizes="60x60" href="img/favicons/apple-icon-60x60.png">
+<link rel="apple-touch-icon" sizes="72x72" href="img/favicons/apple-icon-72x72.png">
+<link rel="apple-touch-icon" sizes="76x76" href="img/favicons/apple-icon-76x76.png">
+<link rel="apple-touch-icon" sizes="114x114" href="img/favicons/apple-icon-114x114.png">
+<link rel="apple-touch-icon" sizes="120x120" href="img/favicons/apple-icon-120x120.png">
+<link rel="apple-touch-icon" sizes="144x144" href="img/favicons/apple-icon-144x144.png">
+<link rel="apple-touch-icon" sizes="152x152" href="img/favicons/apple-icon-152x152.png">
+<link rel="apple-touch-icon" sizes="180x180" href="img/favicons/apple-icon-180x180.png">
+<link rel="icon" type="image/png" sizes="192x192"  href="img/favicons/android-icon-192x192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicons/favicon-32x32.png">
+<link rel="icon" type="image/png" sizes="96x96" href="img/favicons/favicon-96x96.png">
+<link rel="icon" type="image/png" sizes="16x16" href="img/favicons/favicon-16x16.png">
+<link rel="manifest" href="img/favicons/manifest.json">
+
 </head>
 
 
@@ -94,6 +111,12 @@ Connection error
 	<td><label class="switch">
   <input type="checkbox" id="GarageDoor" name="GarageDoor" value="GarageDoor" onClick="setEDRT(edrthttp, 'GarageDoor')";>
   <span class="slider round"></span>
+</label></td>
+</tr>
+
+<tr>
+	<td class="w3-container w3-cell-middle w3-text-white w3-cell">Power consumption</td>
+	<td><div id="powerConsumption"></div></span>
 </label></td>
 </tr>
 
@@ -173,10 +196,12 @@ edrthttp.onerror = function() {
 }
 edrthttp.send();
 
-// setup get temp timer loop
+// setup get temp / power timer loop
 
 getTemperature();
 setInterval (getTemperature, 30000);
+getPower();
+setInterval (getPower, 30000);
 
 
 // library functions
@@ -189,10 +214,10 @@ function setEDRT(edrthttp, VO) {
 	else if (VO == "HeatBoost") { VO_id = 4; }
 	else {
 
-		VO_id = 6;
+	VO_id = 6;
 
-		// setup timer to clear the garage button
-		setTimeout( function() { document.getElementById("GarageDoor").checked = false; } ,1000);
+	// setup timer to clear the garage button
+	setTimeout( function() { document.getElementById("GarageDoor").checked = false; } ,1000);
 
 	}
 
@@ -230,6 +255,29 @@ function getTemperature() {
 	}
   
 	edrttemphttp.open("GET", edrt_url+"&Get=XENO", true);
+	edrttemphttp.onerror = function() {
+		document.getElementById("conn_status").style.display = "block";
+	}
+	edrttemphttp.send();
+
+};
+
+// get power consumption
+
+function getPower() {
+
+	var edrt_url = "http://"+edrt_ip+":"+edrt_port+"/api/xdevices.json?key="+apikey;
+	var edrttemphttp = new XMLHttpRequest();
+
+	edrttemphttp.onreadystatechange = function() {
+		if (this.readyState == 4 && this.status == 200) {
+			edrtPowerResp = JSON.parse(this.responseText);
+			document.getElementById("powerConsumption").innerHTML = String(edrtPowerResp["PAPP"]) + " Watts";
+		}
+	document.getElementById("conn_status").style.display = "none";
+	}
+  
+	edrttemphttp.open("GET", edrt_url+"&Get=TI", true);
 	edrttemphttp.onerror = function() {
 		document.getElementById("conn_status").style.display = "block";
 	}
